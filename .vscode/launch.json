@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        // Local FastApi
+        {
+            "name": "FastAPI: Debug",
+            "type": "python",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8001", // It needs to be different from the port in docker-compose.yml
+                "--log-level",
+                "debug",
+                "--reload"
+            ],
+            "env": {
+                "PYTHONUNBUFFERED": "1",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": true
+        }
+    ]
+}
