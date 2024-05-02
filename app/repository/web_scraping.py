@@ -29,6 +29,7 @@ async def get_apis(data_req: dict, key, session):
             url,
             headers=data_req[key]["headers"],
             timeout=timeout,
+            verify_ssl=False,            
         ) as response:
             if response.status == 200:  # pylint: disable=R1705
                 try:
@@ -69,6 +70,7 @@ async def post_api(data_req: dict, key, session):
             headers=data_req[key]["headers"],
             json=data_req[key]["payload"],
             timeout=timeout,
+            verify_ssl=False,
         ) as response:
             if response.status == 200:  # pylint: disable=R1705
                 try:
