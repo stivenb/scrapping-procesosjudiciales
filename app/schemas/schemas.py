@@ -5,14 +5,9 @@ from pydantic import BaseModel, validator
 
 
 class Actor(BaseModel):
-    cedulaActor: str
+    cedulaActor: Optional[str] = ""
     nombreActor: Optional[str] = ""
 
-    @validator("cedulaActor")
-    def validate_cedulaActor_length(cls, v):
-        if len(v) < 3:
-            raise ValueError("La cédula del actor debe tener al menos 3 caracteres")
-        return v
 
 
 class Demandado(BaseModel):

@@ -1,10 +1,12 @@
 import asyncio 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 
 from app.repository import web_scraping
 
 from app.schemas.schemas import CausaJudicial
 from fastapi import APIRouter, Request 
+from sqlalchemy.orm import Session
+from app.database.session import get_db
  
 
 router = APIRouter(prefix="/web_scraping", tags=["web_scraping"])
@@ -23,7 +25,7 @@ def test():
     return "test"
 
 @router.post("/", status_code=200)
-def post_api_scrapping(request: Request, causa_judicial: CausaJudicial):
+def post_api_scrapping(request: Request, causa_judicial: CausaJudicial, db: Session = Depends(get_db), ):
     causa_judicial = causa_judicial.dict()
     causas = web_scraping.get_all_causas(causa_judicial)
     if not causas:
@@ -34,6 +36,7 @@ def post_api_scrapping(request: Request, causa_judicial: CausaJudicial):
     )
     data_details = web_scraping.generate_payload_details(elements_search_causas)
     datails = asyncio.run(web_scraping.consume_api_get(data_details, "data_info_juicio"))
+    web_scraping.insert_juicio(datails, db)
     return {
         "causas": datails,
     }

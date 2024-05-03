@@ -1,3 +1,4 @@
+from app.database.models import models
 from app.utils import MakeRequestSync 
 from app.settings import (
     URL_API_FUNCTION_JUDICIAL_CONTAR_CAUSAS,
@@ -212,3 +213,64 @@ def generate_payload_actuaciones_judiciales(data: list, id_juicio: str):
         }
         list_elements.append(dictionary)
     return list_elements
+
+def insert_juicio(data, session):
+    """
+    Inserta un juicio en la base de datos, junto con sus incidentes y litigantes asociados.
+    """
+    # Crear el juicio
+    juicio = models.Causa(
+        idJuicio=data["idJuicio"],
+        estadoActual=data.get("estadoActual"),
+        idMateria=data.get("idMateria"),
+        nombreDelito=data.get("nombreDelito"),
+        fechaIngreso=data.get("fechaIngreso"),
+    )
+    
+    # Añadir incidentes
+    for incidente_data in data["data_info_juicio"]:
+        incidente = models.Incidente(
+            idIncidenteJudicatura=incidente_data["lstIncidenteJudicatura"][0]["idIncidenteJudicatura"],
+            idMovimientoJuicioIncidente=incidente_data["lstIncidenteJudicatura"][0]["idMovimientoJuicioIncidente"],
+            fechaCrea=incidente_data["lstIncidenteJudicatura"][0]["fechaCrea"],
+            incidente=incidente_data["lstIncidenteJudicatura"][0]["incidente"],
+        )
+        
+        # Añadir litigantes al incidente
+        for litigante_data in incidente_data["lstIncidenteJudicatura"][0]["lstLitiganteActor"]:
+            litigante = models.Litigante(
+                tipoLitigante=litigante_data["tipoLitigante"],
+                nombresLitigante=litigante_data["nombresLitigante"],
+                representadoPor=litigante_data["representadoPor"],
+            )
+            incidente.litigantes.append(litigante)
+        
+        for litigante_data in incidente_data["lstIncidenteJudicatura"][0]["lstLitiganteDemandado"]:
+            litigante = models.Litigante(
+                tipoLitigante=litigante_data["tipoLitigante"],
+                nombresLitigante=litigante_data["nombresLitigante"],
+                representadoPor=litigante_data["representadoPor"],
+            )
+            incidente.litigantes.append(litigante)
+
+        # Añadir actuaciones al incidente
+        if "data_info_actuacion" in incidente_data:
+            for actuacion_data in incidente_data["data_info_actuacion"]["actuaciones"]:
+                actuacion = models.Actuacion(
+                    codigo=actuacion_data["codigo"],
+                    idJudicatura=actuacion_data["idJudicatura"],
+                    fecha=actuacion_data["fecha"],
+                    tipo=actuacion_data["tipo"],
+                    actividad=actuacion_data["actividad"],
+                    visible=actuacion_data["visible"],
+                    uuid=actuacion_data["uuid"],
+                    nombreArchivo=actuacion_data["nombreArchivo"],
+                )
+                incidente.actuaciones.append(actuacion)
+        
+        # Asociar el incidente con el juicio
+        juicio.incidentes.append(incidente)
+    
+    # Añadir el juicio a la sesión y hacer commit
+    session.add(juicio)
+    session.commit()
