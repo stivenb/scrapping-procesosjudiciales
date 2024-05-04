@@ -4,7 +4,7 @@ Archivo que contiene la clase Database y la función get_db.
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from app.settings import DB_HOST_WRITER, DB_HOST_READ
+from app.settings import  DB_URL_WRITER, DB_URL_READ
 
 engines = {}
 
@@ -55,8 +55,8 @@ class RoutingSession(Session):
         return s
 
 
-engines["writer"] = create_engine(DB_HOST_WRITER, logging_name="writer", echo=False)
-engines["reader"] = create_engine(DB_HOST_READ, logging_name="reader", echo=False)
+engines["writer"] = create_engine(DB_URL_WRITER, logging_name="writer", echo=False)
+engines["reader"] = create_engine(DB_URL_READ, logging_name="reader", echo=False)
 session_database = sessionmaker(
     autocommit=False, autoflush=False, class_=RoutingSession
 )
@@ -69,7 +69,7 @@ def get_db():
     :return: Una sesión de base de datos.
     :rtype: Session
     """
-    db = session_database.Session()
+    db = session_database()
     try:
         yield db
     finally:

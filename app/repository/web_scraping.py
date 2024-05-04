@@ -8,6 +8,8 @@ from app.settings import (
     URL_ACTUACIONES_JUDICIALES
 )
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 import math
 import asyncio
 import aiohttp 
@@ -214,9 +216,9 @@ def generate_payload_actuaciones_judiciales(data: list, id_juicio: str):
         list_elements.append(dictionary)
     return list_elements
 
-def insert_juicio(data, session):
+def insert_juicio(data: dict, session: Session):
     """
-    Inserta un juicio en la base de datos, junto con sus incidentes y litigantes asociados.
+    Inserta un juicio en la base de datos, junto con sus incidentes, litigantes y actuaciones asociados.
     """
     # Crear el juicio
     juicio = models.Causa(
@@ -228,49 +230,77 @@ def insert_juicio(data, session):
     )
     
     # Añadir incidentes
-    for incidente_data in data["data_info_juicio"]:
-        incidente = models.Incidente(
-            idIncidenteJudicatura=incidente_data["lstIncidenteJudicatura"][0]["idIncidenteJudicatura"],
-            idMovimientoJuicioIncidente=incidente_data["lstIncidenteJudicatura"][0]["idMovimientoJuicioIncidente"],
-            fechaCrea=incidente_data["lstIncidenteJudicatura"][0]["fechaCrea"],
-            incidente=incidente_data["lstIncidenteJudicatura"][0]["incidente"],
-        )
-        
-        # Añadir litigantes al incidente
-        for litigante_data in incidente_data["lstIncidenteJudicatura"][0]["lstLitiganteActor"]:
-            litigante = models.Litigante(
-                tipoLitigante=litigante_data["tipoLitigante"],
-                nombresLitigante=litigante_data["nombresLitigante"],
-                representadoPor=litigante_data["representadoPor"],
-            )
-            incidente.litigantes.append(litigante)
-        
-        for litigante_data in incidente_data["lstIncidenteJudicatura"][0]["lstLitiganteDemandado"]:
-            litigante = models.Litigante(
-                tipoLitigante=litigante_data["tipoLitigante"],
-                nombresLitigante=litigante_data["nombresLitigante"],
-                representadoPor=litigante_data["representadoPor"],
-            )
-            incidente.litigantes.append(litigante)
+    for incidente_data in data.get("data_info_juicio", []):
+        try:
+            # Evitar errores en caso de datos faltantes
+            lst_incidentes = incidente_data.get("lstIncidenteJudicatura", [])
+            if not lst_incidentes:
+                continue
+            
+            incidente_judicatura = lst_incidentes[0]
 
-        # Añadir actuaciones al incidente
-        if "data_info_actuacion" in incidente_data:
-            for actuacion_data in incidente_data["data_info_actuacion"]["actuaciones"]:
-                actuacion = models.Actuacion(
-                    codigo=actuacion_data["codigo"],
-                    idJudicatura=actuacion_data["idJudicatura"],
-                    fecha=actuacion_data["fecha"],
-                    tipo=actuacion_data["tipo"],
-                    actividad=actuacion_data["actividad"],
-                    visible=actuacion_data["visible"],
-                    uuid=actuacion_data["uuid"],
-                    nombreArchivo=actuacion_data["nombreArchivo"],
-                )
-                incidente.actuaciones.append(actuacion)
+            incidente = models.Incidente(
+                idIncidenteJudicatura=incidente_judicatura.get("idIncidenteJudicatura"),
+                idMovimientoJuicioIncidente=incidente_judicatura.get("idMovimientoJuicioIncidente"),
+                fechaCrea=incidente_judicatura.get("fechaCrea"),
+                incidente=incidente_judicatura.get("incidente"),
+            )
+            
+            # Añadir litigantes al incidente
+            lst_litigante_actor = incidente_judicatura.get("lstLitiganteActor") or []
+            lst_litigante_demandado = incidente_judicatura.get("lstLitiganteDemandado") or []
+
+            for litigante_data in lst_litigante_actor:
+                try:
+                    litigante = models.Litigante(
+                        tipoLitigante=litigante_data.get("tipoLitigante"),
+                        nombresLitigante=litigante_data.get("nombresLitigante"),
+                        representadoPor=litigante_data.get("representadoPor"),
+                    )
+                    incidente.litigantes.append(litigante)
+                except Exception as e:
+                    print(f"Error inserting Litigante (actor): {str(e)}")
+
+            for litigante_data in lst_litigante_demandado:
+                try:
+                    litigante = models.Litigante(
+                        tipoLitigante=litigante_data.get("tipoLitigante"),
+                        nombresLitigante=litigante_data.get("nombresLitigante"),
+                        representadoPor=litigante_data.get("representadoPor"),
+                    )
+                    incidente.litigantes.append(litigante)
+                except Exception as e:
+                    print(f"Error inserting Litigante (demandado): {str(e)}")
+
+            # Añadir actuaciones al incidente
+            if "data_info_actuacion" in incidente_data:
+                lst_actuaciones = incidente_data["data_info_actuacion"].get("actuaciones", [])
+                for actuacion_data in lst_actuaciones:
+                    try:
+                        actuacion = models.Actuacion(
+                            codigo=actuacion_data.get("codigo"),
+                            idJudicatura=actuacion_data.get("idJudicatura"),
+                            fecha=actuacion_data.get("fecha"),
+                            tipo=actuacion_data.get("tipo"),
+                            actividad=actuacion_data.get("actividad"),
+                            visible=actuacion_data.get("visible"),
+                            uuid=actuacion_data.get("uuid"),
+                            nombreArchivo=actuacion_data.get("nombreArchivo"),
+                        )
+                        incidente.actuaciones.append(actuacion)
+                    except Exception as e:
+                        print(f"Error inserting Actuacion: {str(e)}")
+            
+            # Asociar el incidente con el juicio
+            juicio.incidentes.append(incidente)
         
-        # Asociar el incidente con el juicio
-        juicio.incidentes.append(incidente)
+        except Exception as e:
+            print(f"Error inserting Incidente: {str(e)}")
     
     # Añadir el juicio a la sesión y hacer commit
-    session.add(juicio)
-    session.commit()
+    try:
+        session.add(juicio)
+        session.commit()
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"Error committing Juicio: {str(e)}")

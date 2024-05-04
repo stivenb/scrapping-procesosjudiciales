@@ -89,3 +89,10 @@ class Actuacion(Base):
     
     # Foreign Key
     incidente_id = Column(Integer, ForeignKey("incidente.id"), nullable=False)
+
+class User(Base):
+    __tablename__ = 'user'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(200), nullable=False, index=True)
+    password = Column(String(255))
