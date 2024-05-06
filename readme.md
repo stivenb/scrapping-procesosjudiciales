@@ -14,8 +14,6 @@ alembic init alembic
 alembic revision --autogenerate -m "init models"
 alembic upgrade heads
 
-# Docker-compose
-docker-compose up --force-recreate --build
 
 ## Scaffolding and Architecture
 
